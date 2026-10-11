@@ -6,7 +6,7 @@ public class ActorBinder : MonoBehaviour
     #region 引用
     [Header("数值")]
     [Tooltip("最大血量")]
-    public int MaxHealth = 80;
+    public int MaxHealth = 75;
 
     [Tooltip("角色名")]
     public string ActorName = "角色";
@@ -24,6 +24,10 @@ public class ActorBinder : MonoBehaviour
     public Actor Data { get; private set; }
 
     private Coroutine _hitRoutine;
+
+    [Header("身份")]
+    [Tooltip("勾上 = 这是玩家（决定受伤音效）")]
+    public bool IsPlayer;
 
     #endregion
 
@@ -78,6 +82,13 @@ public class ActorBinder : MonoBehaviour
             _hitRoutine = StartCoroutine(View.HitReaction(FlashColor));
         }
 
+        // ★ 受伤音效：玩家和敌人用不同音调
+        if (hpLoss > 0)
+        {
+            if (IsPlayer) AudioManager.Instance.PlayPlayerHit();
+            else AudioManager.Instance.PlayEnemyHit();
+        }
+
         return hpLoss;
     }
 
@@ -105,4 +116,28 @@ public class ActorBinder : MonoBehaviour
 
     [ContextMenu("测试：获得 5 点格挡")]
     private void TestBlock() { GainBlock(5); Debug.Log(ActorName + " 获得 5 点格挡"); }
+
+    public void Configure(int maxHealth, string actorName)
+    {
+        // 1) 退订旧数据的事件
+        if (Data != null)
+        {
+            Data.Changed -= OnDataChanged;
+            Data.Died -= OnDied;
+        }
+
+        MaxHealth = Mathf.Max(1, maxHealth);
+        ActorName = string.IsNullOrEmpty(actorName) ? ActorName : actorName;
+
+        // 2) 重建数据对象（血量会按新上限回满）
+        Data = new Actor(MaxHealth, ActorName);
+        Data.Changed += OnDataChanged;
+        Data.Died += OnDied;
+
+        // 3) 血条重新绑定到新对象
+        if (HpBar == null) HpBar = GetComponentInChildren<HealthBar>(true);
+        if (HpBar != null) HpBar.Bind(Data);
+
+        Debug.Log("[ActorBinder] " + ActorName + " 已配置：血量 " + Data.Health + " / " + Data.MaxHealth);
+    }
 }

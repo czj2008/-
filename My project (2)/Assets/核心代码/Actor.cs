@@ -79,4 +79,9 @@ public class Actor
     {
         if (Changed != null) Changed(this);
     }
+    public void SetHealth(int value)
+    {
+        Health = Mathf.Clamp(value, 0, MaxHealth);
+        NotifyChanged();
+    }
 }

@@ -50,4 +50,15 @@ public class CardLibrary : MonoBehaviour
             CardFace = source.CardFace
         };
     }
+
+    public CardDef FindCardById(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+
+        for (int i = 0; i < AllCards.Count; i++)
+        {
+            if (AllCards[i] != null && AllCards[i].Id == id) return AllCards[i];
+        }
+        return null;
+    }
 }

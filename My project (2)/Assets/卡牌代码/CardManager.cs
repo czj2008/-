@@ -63,20 +63,35 @@ public class CardManager : MonoBehaviour
     //  初始化
     // =====================================================================
 
+    // CardManager.cs
     private void Start()
     {
-        if (CardPrefab == null || HandArea == null || Library == null)
+        if (CardPrefab == null || HandArea == null)
         {
-            Debug.LogError("[CardManager] 缺少引用，卡牌系统停止工作："
-                + " CardPrefab=" + (CardPrefab != null)
-                + " HandArea=" + (HandArea != null)
-                + " Library=" + (Library != null), this);
+            Debug.LogError("[CardManager] Card Prefab / Hand Area 没拖。", this);
             enabled = false;
             return;
         }
 
-        _deck = new Deck();
-        _deck.Initialize(Library.BuildStartingDeck());
+        // ★ 只有当外部没有设置过牌组时，才用默认牌组
+        if (_deck == null)
+        {
+            if (Library != null)
+            {
+                _deck = new Deck();
+                _deck.Initialize(Library.BuildStartingDeck());
+                Debug.Log("[CardManager] 使用默认牌组：" + _deck.DrawPileCount + " 张");
+            }
+            else
+            {
+                Debug.LogWarning("[CardManager] 没有牌组也没有 Library，抽不出牌。", this);
+            }
+        }
+        else
+        {
+            Debug.Log("[CardManager] 已由外部设置牌组，跳过默认牌组");
+        }
+
         RefreshPileText();
     }
 
@@ -85,15 +100,19 @@ public class CardManager : MonoBehaviour
     // =====================================================================
 
     /// <summary>抽满一手牌（每个玩家回合开始时由 BattleManager 调用）。</summary>
-    public IEnumerator DrawHand()
+
+    public IEnumerator DrawCards(int count)
     {
         if (_deck == null)
         {
-            Debug.LogError("[CardManager] _deck 是 null，Start() 里的初始化没执行。", this);
+            Debug.LogError("[CardManager] _deck 是 null，无法抽牌。", this);
             yield break;
         }
+        if (count <= 0) yield break;
 
-        for (int i = 0; i < DrawPerTurn; i++)
+        int drawn = 0;
+
+        for (int i = 0; i < count; i++)
         {
             if (_hand.Count >= MaxHandSize) break;
 
@@ -105,11 +124,19 @@ public class CardManager : MonoBehaviour
 
             view.Setup(card, this);
             _hand.Add(view);
+            drawn++;
         }
 
         RefreshPileText();
         RefreshPlayableState();
-        yield return StartCoroutine(LayoutHand(0.18f));
+
+        // 抽到了才重排（没抽到就不用动）
+        if (drawn > 0) yield return StartCoroutine(LayoutHand(0.18f));
+    }
+
+    public IEnumerator DrawHand()
+    {
+        yield return StartCoroutine(DrawCards(DrawPerTurn));
     }
 
     // =====================================================================
@@ -305,5 +332,43 @@ public class CardManager : MonoBehaviour
 
         view.gameObject.SetActive(false);
         _pool.Add(view);
+    }
+
+    // CardManager.cs
+    /// <summary>用指定的牌组初始化（跨战斗延续牌组用）。</summary>
+    public void SetDeck(System.Collections.Generic.List<CardDef> deck)
+    {
+        _deck = new Deck();
+        _deck.Initialize(deck);
+        RefreshPileText();
+        Debug.Log("[CardManager] 牌组已设置，共 " + _deck.DrawPileCount + " 张。");
+    }
+    public List<CardDef> DrawRandomRewardCards(List<RewardOption> pool, int count)
+    {
+        List<CardDef> result = new List<CardDef>();
+        if (pool == null || pool.Count == 0) return result;
+
+        // 1) 按权重把所有候选展开成一个"抽奖池"（权重大的出现多次）
+        List<CardDef> tickets = new List<CardDef>();
+        for (int i = 0; i < pool.Count; i++)
+        {
+            RewardOption option = pool[i];
+            if (option == null || option.Card == null) continue;
+
+            int weight = Mathf.Max(1, option.Weight);
+            for (int w = 0; w < weight; w++) tickets.Add(option.Card);
+        }
+        if (tickets.Count == 0) return result;
+
+        // 2) 抽 count 次，抽到的不重复
+        int guard = 0;
+        while (result.Count < count && guard < 200)
+        {
+            guard++;
+            CardDef picked = tickets[Random.Range(0, tickets.Count)];
+            if (!result.Contains(picked)) result.Add(picked);
+        }
+
+        return result;
     }
 }

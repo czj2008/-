@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Tween : MonoBehaviour
 {
@@ -133,4 +134,32 @@ public class Tween : MonoBehaviour
         }
         group.alpha = to;
     }
+
+    /// <summary>UI 图片透明度补间（Image 版）。</summary>
+    public static IEnumerator FadeGraphic(Graphic graphic, float from, float to, float duration)
+    {
+        if (graphic == null) yield break;
+
+        if (duration <= 0f) { SetAlpha(graphic, to); yield break; }
+
+        float t = 0f;
+        SetAlpha(graphic, from);
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            SetAlpha(graphic, Mathf.LerpUnclamped(from, to, t / duration));
+            yield return null;
+        }
+        SetAlpha(graphic, to);
+    }
+
+    /// <summary>给 Graphic 单独设置 alpha（保留原本的 RGB）。</summary>
+    private static void SetAlpha(Graphic graphic, float alpha)
+    {
+        Color c = graphic.color;
+        c.a = alpha;
+        graphic.color = c;
+    }
 }
+
+
